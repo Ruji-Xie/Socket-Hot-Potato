@@ -387,7 +387,9 @@ int main(int argc, char *argv[]) {
   player.receive_neighbor_server_ai();
   player.connect_neighbor_server();
   player.accept_connection();
-  player.receive_message();
+  if (DEBUG) {
+    player.receive_message();
+  }
   player.init_fd_set();
   player.play();
 //  sleep(1);
