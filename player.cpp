@@ -283,7 +283,8 @@ public:
           potato = tmp;
         }
       }
-      if (!FD_ISSET(neighbor_player_connection_fd, &read_fds) && !FD_ISSET(neighbor_server_fd, &read_fds) && FD_ISSET(ringmaster_fd, &read_fds)) {
+
+      if (!FD_ISSET(neighbor_player_connection_fd, &read_fds) && !FD_ISSET(neighbor_server_fd, &read_fds) && !FD_ISSET(ringmaster_fd, &read_fds)) {
         std::cerr << "no idea where this shit comes from" << std::endl;
         continue;
       }
