@@ -279,6 +279,6 @@ int main(int argc, char *argv[])
   ring_master.send_player_id_to_player();
   ring_master.send_neighbour_server_info_to_player();
   ring_master.start_game(std::stoi(argv[3]));
-
+//  sleep(1);
   return 0;
 }

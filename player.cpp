@@ -256,23 +256,32 @@ public:
 
   int play() {
 
-    potato_t potato{};
     while(1) {
 
+      potato_t potato{};
       fd_set read_fds = socket_read_fds;
       int rv = select(max_fd + 1, &read_fds, nullptr, nullptr, nullptr);
-      assert(rv == 1);
+//      assert(rv == 1);
       if (FD_ISSET(ringmaster_fd, &read_fds)) {
-        recv(ringmaster_fd, &potato, sizeof(potato), MSG_WAITALL);
+        int size = recv(ringmaster_fd, &potato, sizeof(potato), MSG_WAITALL);
+        if (size == 0) {
+          continue;
+        }
         std::cout << "received potato from master" << std::endl;
       }
       else if (FD_ISSET(neighbor_server_fd, &read_fds)) {
         std::cout << "received potato from player" << std::endl;
-        recv(neighbor_server_fd, &potato, sizeof(potato), MSG_WAITALL);
+        int size = recv(neighbor_server_fd, &potato, sizeof(potato), MSG_WAITALL);
+        if (size == 0) {
+          continue;
+        }
       }
       else if (FD_ISSET(neighbor_player_connection_fd, &read_fds)) {
         std::cout << "received potato from player" << std::endl;
-        recv(neighbor_player_connection_fd, &potato, sizeof(potato), MSG_WAITALL);
+        int size = recv(neighbor_player_connection_fd, &potato, sizeof(potato), MSG_WAITALL);
+        if (size == 0) {
+          continue;
+        }
       }
       else {
         std::cerr << "no idea where this shit comes from" << std::endl;
@@ -299,11 +308,6 @@ public:
           }
           break;
         } else {
-
-//            potato.trace[potato.count] = id;
-//            potato.count++;
-//            std::cout << "send to neighbor player connection" << std::endl;
-//            send(neighbor_player_connection_fd, &potato, sizeof(potato), 0);
           int rand_int = rand() % 2;
           potato.trace[potato.count] = id;
           potato.count++;
@@ -346,6 +350,6 @@ int main(int argc, char *argv[]) {
   player.receive_message();
   player.init_fd_set();
   player.play();
-
+//  sleep(1);
   return 0;
 }
