@@ -345,7 +345,6 @@ public:
         } else {
           int rand_int = rand() % 2;
           potato.trace[potato.count] = id;
-          potato.count++;
           if (rand_int == 0) {
             if (DEBUG) {
               std::cout << "rand int: " << rand_int << ", send to who connects to me" << std::endl;

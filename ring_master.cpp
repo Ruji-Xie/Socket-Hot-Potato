@@ -279,6 +279,7 @@ public:
     for (int i = 0; i < received_potato.count; i++) {
       std::cout << received_potato.trace[i] << (i == received_potato.count - 1 ?  "" : ", ");
     }
+    std::cout << std::endl;
 
     if (DEBUG) {
       std::cout << "\n potato trace ends. " << std::endl;
