@@ -278,7 +278,7 @@ public:
       if (FD_ISSET(neighbor_player_connection_fd, &read_fds)) {
         std::cout << "received potato from player" << std::endl;
         potato_t tmp{};
-        int size = recv(neighbor_player_connection_fd, &potato, sizeof(potato), MSG_WAITALL);
+        int size = recv(neighbor_player_connection_fd, &tmp, sizeof(tmp), MSG_WAITALL);
         if (size == sizeof(potato)) {
           potato = tmp;
         }
