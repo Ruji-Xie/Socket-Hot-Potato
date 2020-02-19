@@ -180,14 +180,22 @@ public:
   }
 
   int check_which_player_is_ready() {
+    init_fd_set();
+    if (DEBUG) {
+      std::cout << "check which one is ready" << std::endl;
+    }
+    int num_ready = 0;
 
     while (1) {
-      int rv = select(max_fd + 1, &socket_read_fds, nullptr, nullptr, nullptr);
-      int num_ready = 0;
-      potato_t received_potato{};
+      fd_set rdfs = socket_read_fds;
+      int rv = select(max_fd + 1, &rdfs, nullptr, nullptr, nullptr);
+      if (DEBUG) {
+        std::cout << "someone is ready" << std::endl;
+      }
+      if (rv == 0) { continue; }
       for (int i = 0; i < num_players; i++) {
-        if (FD_ISSET(player_sock_fd_vec[i], &socket_read_fds)) {
-          int id;
+        if (FD_ISSET(player_sock_fd_vec[i], &rdfs)) {
+          int id = 0;
           int size = recv(player_sock_fd_vec[i], &id, sizeof(id), MSG_WAITALL);
           if (size < sizeof(id)) {
             std::cerr << "id is not completely recv, recv size: " << id << std::endl;
@@ -251,7 +259,6 @@ public:
     if (DEBUG) {
       std::cout << "start game" << std::endl;
     }
-    init_fd_set();
     potato_t potato{};
     potato.hop = hop;
     int rand_int = rand() % num_players;
@@ -353,6 +360,7 @@ int main(int argc, char *argv[])
   ring_master.send_player_id_to_player();
   ring_master.send_player_num_to_player();
   ring_master.send_neighbour_server_info_to_player();
+
   ring_master.check_which_player_is_ready();
   ring_master.start_game();
 //  sleep(1);

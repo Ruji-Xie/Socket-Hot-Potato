@@ -27,7 +27,9 @@ class Player {
   int player_server_fd{};
   int ringmaster_fd{};
   int neighbor_server_fd{};
+  int neighbor_server_id;
   int neighbor_player_connection_fd{};
+  int player_connection_id;
 
   fd_set socket_read_fds{};
 
@@ -116,6 +118,11 @@ public:
     if (neighbor_player_connection_fd == -1) {
       std::cerr << "Error: cannot accept connection on socket" << std::endl;
       return -1;
+    }
+
+    int size = send(neighbor_player_connection_fd, &id, sizeof(id), 0);
+    if (size != sizeof(id)) {
+      std::cerr << "id is not completely sent, sent size: " << size << std::endl;
     }
 
     if (DEBUG) {
@@ -246,6 +253,16 @@ public:
 
     freeaddrinfo(host_info_list);
 
+    if (DEBUG) {
+      std::cout << "I have connected to the neighbor server and now wait for receiving neighbor_server_id" << std::endl;
+    }
+
+    int size = send(neighbor_server_fd, &id, sizeof(id), 0);
+    if (size != sizeof(id)) {
+      std::cerr << "id is not completely sent, sent size: " << size << std::endl;
+    }
+
+
     return 0;
   }
 
@@ -254,6 +271,11 @@ public:
     recv(neighbor_player_connection_fd, buffer, 100, MSG_WAITALL);
     std::cout << buffer << std::endl;
     return 0;
+  }
+
+  int receive_neighbor_ids() {
+    recv(neighbor_server_fd, &neighbor_server_id, sizeof(neighbor_server_id), MSG_WAITALL);
+    recv(neighbor_player_connection_fd, &player_connection_id, sizeof(player_connection_id), MSG_WAITALL);
   }
 
 
@@ -277,8 +299,11 @@ public:
 
   int notify_master_I_am_ready() {
     int size = send(ringmaster_fd, &id, sizeof(id), 0);
-    if (size != sizeof(potato)) {
-      std::cerr << "potato is not completely sent, sent size: " << size << std::endl;
+    if (DEBUG) {
+      std::cout << "send my id to master, tell master I am ready" << std::endl;
+    }
+    if (size != sizeof(id)) {
+      std::cerr << "id is not completely sent, sent size: " << size << std::endl;
     }
     return 0;
   }
@@ -342,7 +367,9 @@ public:
         }
         break;
       } else {
-        std::cout << "potato count/hop: " << potato.count << "/" << potato.hop << ", send to ringmaster" << std::endl;
+        if (DEBUG) {
+          std::cout << "potato count/hop: " << potato.count << "/" << potato.hop << ", send to ringmaster" << std::endl;
+        }
         if (++potato.count == potato.hop) {
           std::cout << "I am it!" << std::endl;
           int size = send(ringmaster_fd, &potato, sizeof(potato), 0);
@@ -370,6 +397,7 @@ public:
               std::cerr << "potato is not completely sent, sent size: " << size << std::endl;
             }
           }
+          std::cout << "Sending potato to " << (rand_int == 0 ? player_connection_id : neighbor_server_id) << std::endl;
 
         }
       }
@@ -393,11 +421,13 @@ int main(int argc, char *argv[]) {
   player.receive_neighbor_server_ai();
   player.connect_neighbor_server();
   player.accept_connection();
-  player.notify_master_I_am_ready();
-
   if (DEBUG) {
     player.receive_message();
   }
+
+  player.receive_neighbor_ids();
+
+  player.notify_master_I_am_ready();
   player.init_fd_set();
   player.play();
 //  sleep(1);
