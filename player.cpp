@@ -275,6 +275,14 @@ public:
     return 0;
   }
 
+  int notify_master_I_am_ready() {
+    int size = send(ringmaster_fd, &id, sizeof(id), 0);
+    if (size != sizeof(potato)) {
+      std::cerr << "potato is not completely sent, sent size: " << size << std::endl;
+    }
+    return 0;
+  }
+
   int play() {
 
     while(1) {
@@ -365,7 +373,6 @@ public:
 
         }
       }
-
     }
 
   }
@@ -386,6 +393,8 @@ int main(int argc, char *argv[]) {
   player.receive_neighbor_server_ai();
   player.connect_neighbor_server();
   player.accept_connection();
+  player.notify_master_I_am_ready();
+
   if (DEBUG) {
     player.receive_message();
   }

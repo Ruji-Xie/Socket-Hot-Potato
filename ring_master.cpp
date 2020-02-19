@@ -175,9 +175,38 @@ public:
       if (size < sizeof(player_ai)) {
         std::cerr << "player_ai is not completely sent, sent size: " << size << std::endl;
       }
-      std::cout << "Player " << i << " is ready to play" << std::endl;
     }
     return 0;
+  }
+
+  int check_which_player_is_ready() {
+
+    while (1) {
+      int rv = select(max_fd + 1, &socket_read_fds, nullptr, nullptr, nullptr);
+      int num_ready = 0;
+      potato_t received_potato{};
+      for (int i = 0; i < num_players; i++) {
+        if (FD_ISSET(player_sock_fd_vec[i], &socket_read_fds)) {
+          int id;
+          int size = recv(player_sock_fd_vec[i], &id, sizeof(id), MSG_WAITALL);
+          if (size < sizeof(id)) {
+            std::cerr << "id is not completely recv, recv size: " << id << std::endl;
+          }
+          std::cout << "Player " << id << " is ready to play" << std::endl;
+          if (DEBUG) {
+            std::cout << "receive id from player: " << i << std::endl;
+            std::cout << "ip: " << player_ip_vec[i] << std::endl;
+            std::cout << "port: " << player_port_vec[i] << std::endl;
+          }
+          num_ready++;
+          break;
+        }
+      }
+      if (num_ready == num_players) {
+        break;
+      }
+    }
+
   }
 
   int send_player_id_to_player() {
@@ -324,6 +353,7 @@ int main(int argc, char *argv[])
   ring_master.send_player_id_to_player();
   ring_master.send_player_num_to_player();
   ring_master.send_neighbour_server_info_to_player();
+  ring_master.check_which_player_is_ready();
   ring_master.start_game();
 //  sleep(1);
   return 0;
