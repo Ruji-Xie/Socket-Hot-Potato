@@ -309,9 +309,8 @@ public:
   }
 
   int play() {
-
+    std::cout << "I am player : " << id << std::endl;
     while(1) {
-      std::cout << "I am player : " << id << std::endl;
       potato_t potato{};
       fd_set read_fds = socket_read_fds;
       int rv = select(max_fd + 1, &read_fds, nullptr, nullptr, nullptr);
