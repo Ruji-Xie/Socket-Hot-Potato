@@ -309,7 +309,9 @@ public:
   }
 
   int play() {
-    std::cout << "I am player : " << id << std::endl;
+    if (DEBUG) {
+      std::cout << "I am player : " << id << std::endl;
+    }
     while(1) {
       potato_t potato{};
       fd_set read_fds = socket_read_fds;
