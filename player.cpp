@@ -10,27 +10,40 @@ typedef struct player_ai {
   uint16_t port;
 } player_ai_t;
 
+typedef struct potato {
+  int trace[513];
+  int count;
+  int hop;
+  int end;
+} potato_t;
 
 class Player {
 
-  int socket_fd{};
-  int client_connection_fd{};
+  int player_server_fd{};
+  int ringmaster_fd{};
+  int neighbor_server_fd{};
+  int neighbor_player_connection_fd{};
+  fd_set socket_read_fds{};
+
+  int id;
+
+  int max_fd;
 
   const char * master_ip;
-  const char * master_port;
-  int socket_fd_ringmaster;
 
+  const char * master_port;
   uint16_t player_server_port{};
   player_ai_t neighbor_server_ai{};
-  int neighbor_server_fd;
 
 public:
 
-  Player(const char * master_ip, const char * master_port): master_ip(master_ip), master_port(master_port) {}
+  Player(const char * master_ip, const char * master_port): master_ip(master_ip), master_port(master_port) {
+    srand(time(nullptr));
+  }
 
   ~Player() {
-    close(socket_fd_ringmaster);
-    close(socket_fd);
+    close(ringmaster_fd);
+    close(player_server_fd);
   }
 
   int init_server() {
@@ -54,18 +67,18 @@ public:
     auto *ai = (struct sockaddr_in *)(host_info_list->ai_addr);
     ai->sin_port = 0;
 
-    socket_fd = socket(host_info_list->ai_family,
+    player_server_fd = socket(host_info_list->ai_family,
                        host_info_list->ai_socktype,
                        host_info_list->ai_protocol);
 
-    if (socket_fd == -1) {
+    if (player_server_fd == -1) {
       std::cerr << "Error: cannot create socket" << std::endl;
       return -1;
     }
 
     int yes = 1;
-    status = setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
-    status = bind(socket_fd, host_info_list->ai_addr, host_info_list->ai_addrlen);
+    status = setsockopt(player_server_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
+    status = bind(player_server_fd, host_info_list->ai_addr, host_info_list->ai_addrlen);
     if (status == -1) {
       std::cerr << "Error: cannot bind socket" << std::endl;
       return -1;
@@ -73,7 +86,7 @@ public:
 
     freeaddrinfo(host_info_list);
 
-    status = listen(socket_fd, 100);
+    status = listen(player_server_fd, 100);
     if (status == -1) {
       std::cerr << "Error: cannot listen on socket" << std::endl;
       return -1;
@@ -81,7 +94,7 @@ public:
 
     struct sockaddr_in sin{};
     socklen_t len = sizeof(sin);
-    if (getsockname(socket_fd, (struct sockaddr *)&sin, &len) == -1) {
+    if (getsockname(player_server_fd, (struct sockaddr *)&sin, &len) == -1) {
       std::cerr << "Error: cannot get sock name" << std::endl;
     } else {
       player_server_port = ntohs(sin.sin_port);
@@ -92,16 +105,16 @@ public:
   }
 
   int accept_connection() {
-    struct sockaddr_storage socket_addr;
+    struct sockaddr_storage socket_addr{};
     socklen_t socket_addr_len = sizeof(socket_addr);
-    int neighbor_player_fd = accept(socket_fd, (struct sockaddr *)&socket_addr, &socket_addr_len);
-    if (neighbor_player_fd == -1) {
+    neighbor_player_connection_fd = accept(player_server_fd, (struct sockaddr *)&socket_addr, &socket_addr_len);
+    max_fd = neighbor_player_connection_fd;
+    if (neighbor_player_connection_fd == -1) {
       std::cerr << "Error: cannot accept connection on socket" << std::endl;
       return -1;
     }
     auto *sin = (struct sockaddr_in *) &socket_addr;
-    char neighbor_server_ip[INET_ADDRSTRLEN];
-    inet_ntop(socket_addr.ss_family, sin, neighbor_server_ip, sizeof neighbor_server_ip);
+    const char * neighbor_server_ip = inet_ntoa(sin->sin_addr);
     std::cout << "accept connection from: " << neighbor_server_ip << std::endl;
 
     char message[100] = "Hello, neighbor";
@@ -112,7 +125,7 @@ public:
 
   int connect_ring_master() {
     int status;
-    struct addrinfo host_info;
+    struct addrinfo host_info{};
     struct addrinfo *host_info_list;
 
     memset(&host_info, 0, sizeof(host_info));
@@ -126,10 +139,10 @@ public:
       return -1;
     }
 
-    socket_fd_ringmaster = socket(host_info_list->ai_family,
+    ringmaster_fd = socket(host_info_list->ai_family,
                        host_info_list->ai_socktype,
                        host_info_list->ai_protocol);
-    if (socket_fd_ringmaster == -1) {
+    if (ringmaster_fd == -1) {
       std::cerr << "Error: cannot create socket" << std::endl;
       std::cerr << "  (" << master_ip << "," << master_port << ")" << std::endl;
       return -1;
@@ -137,17 +150,17 @@ public:
 
     std::cout << "Connecting to " << master_ip << " on port " << master_port << "..." << std::endl;
 
-    status = connect(socket_fd_ringmaster, host_info_list->ai_addr, host_info_list->ai_addrlen);
+    status = connect(ringmaster_fd, host_info_list->ai_addr, host_info_list->ai_addrlen);
     if (status == -1) {
       std::cerr << "Error: cannot connect to socket" << std::endl;
       std::cerr << "  (" << master_ip << "," << master_port << ")" << std::endl;
       return -1;
     }
 
-    send(socket_fd_ringmaster, &player_server_port, sizeof(player_server_port), 0);
+    send(ringmaster_fd, &player_server_port, sizeof(player_server_port), 0);
 
 //    uint16_t test = 123;
-//    send(socket_fd, &test, sizeof(test), 0);
+//    send(player_server_fd, &test, sizeof(test), 0);
 
     freeaddrinfo(host_info_list);
 
@@ -155,15 +168,21 @@ public:
   }
 
   int receive_neighbor_server_ai() {
-    recv(socket_fd_ringmaster, &neighbor_server_ai, sizeof(neighbor_server_ai), 0);
+    recv(ringmaster_fd, &neighbor_server_ai, sizeof(neighbor_server_ai), 0);
     std::cout << "neighbor server ip: " << neighbor_server_ai.ip << std::endl;
     std::cout << "neighbor server port: " << neighbor_server_ai.port << std::endl;
     return 0;
   }
 
+  int receive_my_id() {
+    recv(ringmaster_fd, &id, sizeof(id), 0);
+    std::cout << "my id: " << id << std::endl;
+    return 0;
+  }
+
   int connect_neighbor_server() {
     int status;
-    struct addrinfo host_info;
+    struct addrinfo host_info{};
     struct addrinfo *host_info_list;
 
     memset(&host_info, 0, sizeof(host_info));
@@ -199,7 +218,7 @@ public:
     }
 
 //    uint16_t test = 123;
-//    send(socket_fd, &test, sizeof(test), 0);
+//    send(player_server_fd, &test, sizeof(test), 0);
 
     freeaddrinfo(host_info_list);
 
@@ -208,11 +227,93 @@ public:
 
   int receive_message() {
     char buffer[100];
-    recv(socket_fd, buffer, 9, 0);
+    recv(neighbor_player_connection_fd, buffer, 100, 0);
     std::cout << buffer << std::endl;
     return 0;
   }
 
+
+  int init_fd_set() {
+    FD_ZERO(&socket_read_fds);
+    std::cout << "ringmaster fd: " << ringmaster_fd << std::endl;
+    std::cout << "neighbor server fd: " << neighbor_server_fd << std::endl;
+    std::cout << "neighbor player connection fd: " << neighbor_player_connection_fd << std::endl;
+    std::cout << "max fd: " << max_fd << std::endl;
+
+    FD_SET(ringmaster_fd, &socket_read_fds);
+    FD_SET(neighbor_server_fd, &socket_read_fds);
+    FD_SET(neighbor_player_connection_fd, &socket_read_fds);
+    max_fd = std::max(neighbor_server_fd, neighbor_player_connection_fd);
+    max_fd = std::max(max_fd, ringmaster_fd);
+
+    return 0;
+  }
+
+  int play() {
+
+    potato_t potato{};
+    while(1) {
+
+      fd_set read_fds = socket_read_fds;
+      int rv = select(max_fd + 1, &read_fds, nullptr, nullptr, nullptr);
+      if (rv > 1) {
+        std::cout << "stupid code broke again" << std::endl;
+      }
+      if (FD_ISSET(ringmaster_fd, &read_fds)) {
+        recv(ringmaster_fd, &potato, sizeof(potato), 0);
+        std::cout << "received potato from master" << std::endl;
+      }
+      else if (FD_ISSET(neighbor_server_fd, &read_fds)) {
+        std::cout << "received potato from player" << std::endl;
+        recv(neighbor_server_fd, &potato, sizeof(potato), 0);
+      }
+      else if (FD_ISSET(neighbor_player_connection_fd, &read_fds)) {
+        std::cout << "received potato from player" << std::endl;
+        recv(neighbor_player_connection_fd, &potato, sizeof(potato), 0);
+      }
+      else {
+        std::cerr << "no idea where this shit comes from" << std::endl;
+        continue;
+      }
+
+      std::cout << "potato count/hop: " << potato.count << "/" << potato.hop << std::endl;
+      std::cout << "potato trace: " << std::endl;
+      for (int i = 0; i < potato.count; i++) {
+        std::cout << potato.trace[i] << (i == potato.count - 1 ?  "" : ", ");
+      }
+      std::cout << "\npotato trace ends. " << std::endl;
+
+      if (potato.end) {
+        std::cout << "this is the end signal from master" << std::endl;
+        break;
+      } else {
+        if (potato.count == potato.hop) {
+          std::cout << "potato count/hop: " << potato.count << "/" << potato.hop << ", send to ringmaster" << std::endl;
+          std::cout << "I am it!" << std::endl;
+          send(ringmaster_fd, &potato, sizeof(potato), 0);
+          break;
+        } else {
+
+//            potato.trace[potato.count] = id;
+//            potato.count++;
+//            std::cout << "send to neighbor player connection" << std::endl;
+//            send(neighbor_player_connection_fd, &potato, sizeof(potato), 0);
+          int rand_int = rand() % 2;
+          potato.trace[potato.count] = id;
+          potato.count++;
+          if (rand_int == 0) {
+            std::cout << "rand int: " << rand_int << ", send to who connects to me" << std::endl;
+            send(neighbor_player_connection_fd, &potato, sizeof(potato), 0);
+          } else {
+            std::cout << "rand int: " << rand_int << ", send to whom I connect to" << std::endl;
+            send(neighbor_server_fd, &potato, sizeof(potato), 0);
+          }
+        }
+      }
+
+    }
+
+  }
 
 };
 
@@ -225,10 +326,13 @@ int main(int argc, char *argv[]) {
   Player player{argv[1], argv[2]};
   player.init_server();
   player.connect_ring_master();
+  player.receive_my_id();
   player.receive_neighbor_server_ai();
   player.connect_neighbor_server();
   player.accept_connection();
   player.receive_message();
+  player.init_fd_set();
+  player.play();
 
   return 0;
 }

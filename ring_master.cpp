@@ -12,11 +12,20 @@ typedef struct player_ai {
   uint16_t port;
 } player_ai_t;
 
+typedef struct potato {
+  int trace[513];
+  int count;
+  int hop;
+  int end;
+} potato_t;
+
 
 class RingMaster {
 
   int num_players;
   int socket_fd{};
+
+  fd_set socket_read_fds;
 
   const char * master_ip;
   const char * master_port;
@@ -24,6 +33,8 @@ class RingMaster {
   std::vector<int> player_sock_fd_vec;
   std::vector<std::string> player_ip_vec;
   std::vector<uint16_t> player_port_vec;
+
+  int max_fd;
 
   char *neighbor_server_ip{};
   uint16_t neighbor_server_port{};
@@ -73,9 +84,15 @@ public:
 
     int yes = 1;
     status = setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
+    if (status == -1) {
+      std::cerr << "setsockopt failed" << std::endl;
+    }
+
     status = bind(socket_fd, host_info_list->ai_addr, host_info_list->ai_addrlen);
+
     if (status == -1) {
       std::cerr << "Error: cannot bind socket" << std::endl;
+      std::cerr << errno << std::endl;
       std::cerr << "  (" << hostname << "," << master_port << ")" << std::endl;
       return -1;
     } //if
@@ -97,6 +114,7 @@ public:
     struct sockaddr_storage socket_addr{};
     socklen_t socket_addr_len = sizeof(socket_addr);
     player_sock_fd = accept(socket_fd, (struct sockaddr *)&socket_addr, &socket_addr_len);
+    max_fd = player_sock_fd;
     if (player_sock_fd == -1) {
       std::cerr << "Error: cannot accept connection on socket" << std::endl;
       return -1;
@@ -151,15 +169,89 @@ public:
       player_ai_t player_ai;
       stpcpy(player_ai.ip, player_ip_vec[neighbour_id].c_str());
       player_ai.port = player_port_vec[neighbour_id];
+      std::cout << "send neighbor server info to player: " << i << std::endl;
       send(player_sock_fd_vec[i], &player_ai, sizeof(player_ai), 0);
     }
     return 0;
   }
+
+  int send_player_id_to_player() {
+    for (int i = 0; i < num_players; i++) {
+      std::cout << "send id to player: " << i << std::endl;
+      std::cout << "ip: " << player_ip_vec[i] << std::endl;
+      std::cout << "port: " << player_port_vec[i] << std::endl;
+      send(player_sock_fd_vec[i], &i, sizeof(i), 0);
+    }
+    return 0;
+  }
+
+  int init_fd_set() {
+    FD_ZERO(&socket_read_fds);
+    for (int i = 0; i < num_players; i++) {
+      FD_SET(player_sock_fd_vec[i], &socket_read_fds);
+    }
+    return 0;
+  }
+
+
+  int start_game(int hop) {
+    std::cout << "start game" << std::endl;
+    init_fd_set();
+    potato_t potato{};
+    potato.hop = hop;
+    int rand_int = rand() % num_players;
+    std::cout << "send to player: " << rand_int << std::endl;
+    std::cout << "ip: " << player_ip_vec[rand_int] << std::endl;
+    std::cout << "port: " << player_port_vec[rand_int] << std::endl;
+    send(player_sock_fd_vec[rand_int], &potato, sizeof(potato), 0);
+
+    int rv = select(max_fd + 1, &socket_read_fds, nullptr, nullptr, nullptr);
+    int end_player_id = 0;
+    potato_t received_potato{};
+    for (int i = 0; i < num_players; i++) {
+      if (FD_ISSET(player_sock_fd_vec[i], &socket_read_fds)) {
+        int size = recv(player_sock_fd_vec[i], &received_potato, sizeof(received_potato), 0);
+        if (size < sizeof(received_potato)) {
+          std::cerr << "only received potato with size: " << size << std::endl;
+        }
+        std::cout << "receive end potato from player: " << i << std::endl;
+        std::cout << "ip: " << player_ip_vec[i] << std::endl;
+        std::cout << "port: " << player_port_vec[i] << std::endl;
+        end_player_id = i;
+        break;
+      }
+    }
+
+    std::cout << "received potato " << std::endl;
+    std::cout << "potato count/hop: " << received_potato.count << "/" << received_potato.hop << std::endl;
+    std::cout << "potato trace: " << std::endl;
+    for (int i = 0; i < received_potato.count; i++) {
+      std::cout << received_potato.trace[i] << (i == received_potato.count - 1 ?  "" : ", ");
+    }
+    std::cout << "\n potato trace ends. " << std::endl;
+
+    received_potato.end = true;
+    for (int i = 0; i < num_players; i++) {
+      if (i == end_player_id) {
+        continue;
+      }
+
+      std::cout << "send end signal to player: " << i << std::endl;
+      std::cout << "ip: " << player_ip_vec[i] << std::endl;
+      std::cout << "port: " << player_port_vec[i] << std::endl;
+
+      send(player_sock_fd_vec[i], &received_potato, sizeof(received_potato), 0);
+    }
+
+    std::cout << "game ends." << std::endl;
+
+  }
+
 };
 
 int main(int argc, char *argv[])
 {
-  if (argc < 2) {
+  if (argc < 4) {
     std::cerr << "Please enter port num." << std::endl;
     return -1;
   }
@@ -170,8 +262,11 @@ int main(int argc, char *argv[])
 //  int sock;
 //  ring_master.accept_player_connection(ip, sock);
 //  ring_master.receive_test_number();
+  std::cout << "number of hops: " << std::stoi(argv[3]) << std::endl;
   ring_master.collect_player_addr_info();
+  ring_master.send_player_id_to_player();
   ring_master.send_neighbour_server_info_to_player();
+  ring_master.start_game(std::stoi(argv[3]));
 
   return 0;
 }
