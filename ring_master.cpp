@@ -145,7 +145,7 @@ public:
     for (int i = 0; i < num_players; i++) {
       accept_player_connection(player_ip_vec[i], player_sock_fd_vec[i]);
       uint16_t player_port{};
-      recv(player_sock_fd_vec[i], &player_port, sizeof(player_port), 0);
+      recv(player_sock_fd_vec[i], &player_port, sizeof(player_port), MSG_WAITALL);
       std::cout << player_port << std::endl;
       player_port_vec[i] = player_port;
     }
@@ -171,8 +171,8 @@ public:
       player_ai.port = player_port_vec[neighbour_id];
       std::cout << "send neighbor server info to player: " << i << std::endl;
       int size = send(player_sock_fd_vec[i], &player_ai, sizeof(player_ai), 0);
-      if (size != sizeof(player_ai)) {
-        std::cout << "stupid code broke again" << std::endl;
+      if (size < sizeof(player_ai)) {
+        std::cerr << "only received player_ai with size: " << size << std::endl;
       }
     }
     return 0;
@@ -184,8 +184,8 @@ public:
       std::cout << "ip: " << player_ip_vec[i] << std::endl;
       std::cout << "port: " << player_port_vec[i] << std::endl;
       int size = send(player_sock_fd_vec[i], &i, sizeof(i), 0);
-      if (size != sizeof(player_ai)) {
-        std::cout << "stupid code broke again" << std::endl;
+      if (size != sizeof(i)) {
+        std::cout << "only received player_ai with size" << size << std::endl;
       }
     }
     return 0;
@@ -210,8 +210,8 @@ public:
     std::cout << "ip: " << player_ip_vec[rand_int] << std::endl;
     std::cout << "port: " << player_port_vec[rand_int] << std::endl;
     int size = send(player_sock_fd_vec[rand_int], &potato, sizeof(potato), 0);
-    if (size != sizeof(player_ai)) {
-      std::cout << "stupid code broke again" << std::endl;
+    if (size != sizeof(potato)) {
+      std::cout << "stupid potato is not sent" << std::endl;
     }
 
     int rv = select(max_fd + 1, &socket_read_fds, nullptr, nullptr, nullptr);
@@ -219,7 +219,7 @@ public:
     potato_t received_potato{};
     for (int i = 0; i < num_players; i++) {
       if (FD_ISSET(player_sock_fd_vec[i], &socket_read_fds)) {
-        int size = recv(player_sock_fd_vec[i], &received_potato, sizeof(received_potato), 0);
+        int size = recv(player_sock_fd_vec[i], &received_potato, sizeof(received_potato), MSG_WAITALL);
         if (size < sizeof(received_potato)) {
           std::cerr << "only received potato with size: " << size << std::endl;
         }
@@ -250,8 +250,8 @@ public:
       std::cout << "port: " << player_port_vec[i] << std::endl;
 
       int size = send(player_sock_fd_vec[i], &received_potato, sizeof(received_potato), 0);
-      if (size != sizeof(player_ai)) {
-        std::cout << "stupid code broke again" << std::endl;
+      if (size < sizeof(received_potato)) {
+        std::cerr << "only received potato with size: " << size << std::endl;
       }
     }
 

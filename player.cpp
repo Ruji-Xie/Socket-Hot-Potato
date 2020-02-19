@@ -4,6 +4,7 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <cassert>
 
 typedef struct player_ai {
   char ip[INET_ADDRSTRLEN];
@@ -118,8 +119,10 @@ public:
     std::cout << "accept connection from: " << neighbor_server_ip << std::endl;
 
     char message[100] = "Hello, neighbor";
-    send(neighbor_server_fd, &message, sizeof(message), 0);
-
+    int size = send(neighbor_server_fd, &message, sizeof(message), 0);
+    if (size != sizeof(message)) {
+      std::cout << "message Hello neighbor send failed" << std::endl;
+    }
     return 0;
   }
 
@@ -157,8 +160,10 @@ public:
       return -1;
     }
 
-    send(ringmaster_fd, &player_server_port, sizeof(player_server_port), 0);
-
+    int size = send(ringmaster_fd, &player_server_port, sizeof(player_server_port), 0);
+    if (size != sizeof(player_server_port)) {
+      std::cout << "player_server_port send failed" << std::endl;
+    }
 //    uint16_t test = 123;
 //    send(player_server_fd, &test, sizeof(test), 0);
 
@@ -168,14 +173,14 @@ public:
   }
 
   int receive_neighbor_server_ai() {
-    recv(ringmaster_fd, &neighbor_server_ai, sizeof(neighbor_server_ai), 0);
+    recv(ringmaster_fd, &neighbor_server_ai, sizeof(neighbor_server_ai), MSG_WAITALL);
     std::cout << "neighbor server ip: " << neighbor_server_ai.ip << std::endl;
     std::cout << "neighbor server port: " << neighbor_server_ai.port << std::endl;
     return 0;
   }
 
   int receive_my_id() {
-    recv(ringmaster_fd, &id, sizeof(id), 0);
+    recv(ringmaster_fd, &id, sizeof(id), MSG_WAITALL);
     std::cout << "my id: " << id << std::endl;
     return 0;
   }
@@ -227,7 +232,7 @@ public:
 
   int receive_message() {
     char buffer[100];
-    recv(neighbor_player_connection_fd, buffer, 100, 0);
+    recv(neighbor_player_connection_fd, buffer, 100, MSG_WAITALL);
     std::cout << buffer << std::endl;
     return 0;
   }
@@ -256,20 +261,18 @@ public:
 
       fd_set read_fds = socket_read_fds;
       int rv = select(max_fd + 1, &read_fds, nullptr, nullptr, nullptr);
-      if (rv > 1) {
-        std::cout << "stupid code broke again" << std::endl;
-      }
+      assert(rv == 1);
       if (FD_ISSET(ringmaster_fd, &read_fds)) {
-        recv(ringmaster_fd, &potato, sizeof(potato), 0);
+        recv(ringmaster_fd, &potato, sizeof(potato), MSG_WAITALL);
         std::cout << "received potato from master" << std::endl;
       }
       else if (FD_ISSET(neighbor_server_fd, &read_fds)) {
         std::cout << "received potato from player" << std::endl;
-        recv(neighbor_server_fd, &potato, sizeof(potato), 0);
+        recv(neighbor_server_fd, &potato, sizeof(potato), MSG_WAITALL);
       }
       else if (FD_ISSET(neighbor_player_connection_fd, &read_fds)) {
         std::cout << "received potato from player" << std::endl;
-        recv(neighbor_player_connection_fd, &potato, sizeof(potato), 0);
+        recv(neighbor_player_connection_fd, &potato, sizeof(potato), MSG_WAITALL);
       }
       else {
         std::cerr << "no idea where this shit comes from" << std::endl;
@@ -290,7 +293,10 @@ public:
         if (potato.count == potato.hop) {
           std::cout << "potato count/hop: " << potato.count << "/" << potato.hop << ", send to ringmaster" << std::endl;
           std::cout << "I am it!" << std::endl;
-          send(ringmaster_fd, &potato, sizeof(potato), 0);
+          int size = send(ringmaster_fd, &potato, sizeof(potato), 0);
+          if (size != sizeof(potato)) {
+            std::cout << "stupid potato is broken by some stupid dog" << std::endl;
+          }
           break;
         } else {
 
@@ -303,11 +309,18 @@ public:
           potato.count++;
           if (rand_int == 0) {
             std::cout << "rand int: " << rand_int << ", send to who connects to me" << std::endl;
-            send(neighbor_player_connection_fd, &potato, sizeof(potato), 0);
+            int size = send(neighbor_player_connection_fd, &potato, sizeof(potato), 0);
+            if (size != sizeof(potato)) {
+              std::cout << "stupid potato is broken by some stupid dog" << std::endl;
+            }
           } else {
             std::cout << "rand int: " << rand_int << ", send to whom I connect to" << std::endl;
-            send(neighbor_server_fd, &potato, sizeof(potato), 0);
+            int size = send(neighbor_server_fd, &potato, sizeof(potato), 0);
+            if (size != sizeof(potato)) {
+              std::cout << "stupid potato is broken by some stupid dog ri" << std::endl;
+            }
           }
+
         }
       }
 
