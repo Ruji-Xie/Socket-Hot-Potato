@@ -341,8 +341,6 @@ public:
     if (DEBUG) {
       std::cout << "game ends." << std::endl;
     }
-
-
   }
 
 };
