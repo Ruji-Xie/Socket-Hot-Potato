@@ -222,9 +222,6 @@ public:
       return -1;
     }
 
-//    uint16_t test = 123;
-//    send(player_server_fd, &test, sizeof(test), 0);
-
     freeaddrinfo(host_info_list);
 
     return 0;

@@ -125,22 +125,6 @@ public:
     return 0;
   }
 
-  int receive_message(int client_connection_fd) {
-    char buffer[512];
-    recv(client_connection_fd, buffer, 9, 0);
-    buffer[9] = 0;
-    std::cout << buffer << std::endl;
-    return 0;
-  }
-
-
-  int receive_test_number(int client_connection_fd) {
-    uint16_t test;
-    recv(client_connection_fd, &test, sizeof(test), 0);
-    std::cout << test << std::endl;
-    return 0;
-  }
-
   int collect_player_addr_info() {
     for (int i = 0; i < num_players; i++) {
       accept_player_connection(player_ip_vec[i], player_sock_fd_vec[i]);
@@ -166,7 +150,7 @@ public:
   int send_neighbour_server_info_to_player() {
     for (int i = 0; i < num_players; i++) {
       int neighbour_id = (i + 1) % num_players;
-      player_ai_t player_ai;
+      player_ai_t player_ai{};
       stpcpy(player_ai.ip, player_ip_vec[neighbour_id].c_str());
       player_ai.port = player_port_vec[neighbour_id];
       std::cout << "send neighbor server info to player: " << i << std::endl;
@@ -270,10 +254,6 @@ int main(int argc, char *argv[])
   RingMaster ring_master(argv[1], std::stoi(argv[2]));
 
   ring_master.init_server();
-//  std::string ip;
-//  int sock;
-//  ring_master.accept_player_connection(ip, sock);
-//  ring_master.receive_test_number();
   std::cout << "number of hops: " << std::stoi(argv[3]) << std::endl;
   ring_master.collect_player_addr_info();
   ring_master.send_player_id_to_player();
