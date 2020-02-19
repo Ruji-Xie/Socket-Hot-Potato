@@ -170,7 +170,10 @@ public:
       stpcpy(player_ai.ip, player_ip_vec[neighbour_id].c_str());
       player_ai.port = player_port_vec[neighbour_id];
       std::cout << "send neighbor server info to player: " << i << std::endl;
-      send(player_sock_fd_vec[i], &player_ai, sizeof(player_ai), 0);
+      int size = send(player_sock_fd_vec[i], &player_ai, sizeof(player_ai), 0);
+      if (size != sizeof(player_ai)) {
+        std::cout << "stupid code broke again" << std::endl;
+      }
     }
     return 0;
   }
@@ -180,7 +183,10 @@ public:
       std::cout << "send id to player: " << i << std::endl;
       std::cout << "ip: " << player_ip_vec[i] << std::endl;
       std::cout << "port: " << player_port_vec[i] << std::endl;
-      send(player_sock_fd_vec[i], &i, sizeof(i), 0);
+      int size = send(player_sock_fd_vec[i], &i, sizeof(i), 0);
+      if (size != sizeof(player_ai)) {
+        std::cout << "stupid code broke again" << std::endl;
+      }
     }
     return 0;
   }
@@ -203,7 +209,10 @@ public:
     std::cout << "send to player: " << rand_int << std::endl;
     std::cout << "ip: " << player_ip_vec[rand_int] << std::endl;
     std::cout << "port: " << player_port_vec[rand_int] << std::endl;
-    send(player_sock_fd_vec[rand_int], &potato, sizeof(potato), 0);
+    int size = send(player_sock_fd_vec[rand_int], &potato, sizeof(potato), 0);
+    if (size != sizeof(player_ai)) {
+      std::cout << "stupid code broke again" << std::endl;
+    }
 
     int rv = select(max_fd + 1, &socket_read_fds, nullptr, nullptr, nullptr);
     int end_player_id = 0;
@@ -240,7 +249,10 @@ public:
       std::cout << "ip: " << player_ip_vec[i] << std::endl;
       std::cout << "port: " << player_port_vec[i] << std::endl;
 
-      send(player_sock_fd_vec[i], &received_potato, sizeof(received_potato), 0);
+      int size = send(player_sock_fd_vec[i], &received_potato, sizeof(received_potato), 0);
+      if (size != sizeof(player_ai)) {
+        std::cout << "stupid code broke again" << std::endl;
+      }
     }
 
     std::cout << "game ends." << std::endl;
