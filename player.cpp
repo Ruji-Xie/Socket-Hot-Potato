@@ -6,6 +6,8 @@
 #include <arpa/inet.h>
 #include <cassert>
 
+#define DEBUG 0
+
 typedef struct player_ai {
   char ip[INET_ADDRSTRLEN];
   uint16_t port;
@@ -20,26 +22,25 @@ typedef struct potato {
 
 class Player {
 
+  const char * master_ip;
+  const char * master_port;
   int player_server_fd{};
   int ringmaster_fd{};
   int neighbor_server_fd{};
   int neighbor_player_connection_fd{};
+
   fd_set socket_read_fds{};
 
   int id;
+  int num_players;
 
   int max_fd;
-
-  const char * master_ip;
-
-  const char * master_port;
   uint16_t player_server_port{};
   player_ai_t neighbor_server_ai{};
 
 public:
 
   Player(const char * master_ip, const char * master_port): master_ip(master_ip), master_port(master_port) {
-    srand(time(nullptr));
   }
 
   ~Player() {
@@ -101,7 +102,9 @@ public:
       player_server_port = ntohs(sin.sin_port);
     }
 
-    std::cout << "Waiting for connection on port " << player_server_port << std::endl;
+    if (DEBUG) {
+      std::cout << "Waiting for connection on port " << player_server_port << std::endl;
+    }
     return 0;
   }
 
@@ -114,14 +117,17 @@ public:
       std::cerr << "Error: cannot accept connection on socket" << std::endl;
       return -1;
     }
-    auto *sin = (struct sockaddr_in *) &socket_addr;
-    const char * neighbor_server_ip = inet_ntoa(sin->sin_addr);
-    std::cout << "accept connection from: " << neighbor_server_ip << std::endl;
 
-    char message[100] = "Hello, neighbor";
-    int size = send(neighbor_server_fd, &message, sizeof(message), 0);
-    if (size != sizeof(message)) {
-      std::cout << "message Hello neighbor send failed" << std::endl;
+    if (DEBUG) {
+      auto *sin = (struct sockaddr_in *) &socket_addr;
+      const char * neighbor_server_ip = inet_ntoa(sin->sin_addr);
+      std::cout << "accept connection from: " << neighbor_server_ip << std::endl;
+      char message[100] = "Hello, neighbor";
+      int size = send(neighbor_server_fd, &message, sizeof(message), 0);
+      if (size != sizeof(message)) {
+        std::cout << "message Hello neighbor send failed" << std::endl;
+      }
+
     }
     return 0;
   }
@@ -151,7 +157,9 @@ public:
       return -1;
     }
 
-    std::cout << "Connecting to " << master_ip << " on port " << master_port << "..." << std::endl;
+    if (DEBUG) {
+      std::cout << "Connecting to " << master_ip << " on port " << master_port << "..." << std::endl;
+    }
 
     status = connect(ringmaster_fd, host_info_list->ai_addr, host_info_list->ai_addrlen);
     if (status == -1) {
@@ -162,10 +170,8 @@ public:
 
     int size = send(ringmaster_fd, &player_server_port, sizeof(player_server_port), 0);
     if (size != sizeof(player_server_port)) {
-      std::cout << "player_server_port send failed" << std::endl;
+      std::cerr << "player_server_port is not completely sent, sent size: " << size << std::endl;
     }
-//    uint16_t test = 123;
-//    send(player_server_fd, &test, sizeof(test), 0);
 
     freeaddrinfo(host_info_list);
 
@@ -174,16 +180,30 @@ public:
 
   int receive_neighbor_server_ai() {
     recv(ringmaster_fd, &neighbor_server_ai, sizeof(neighbor_server_ai), MSG_WAITALL);
-    std::cout << "neighbor server ip: " << neighbor_server_ai.ip << std::endl;
-    std::cout << "neighbor server port: " << neighbor_server_ai.port << std::endl;
+    if (DEBUG) {
+      std::cout << "neighbor server ip: " << neighbor_server_ai.ip << std::endl;
+      std::cout << "neighbor server port: " << neighbor_server_ai.port << std::endl;
+    }
     return 0;
   }
 
   int receive_my_id() {
     recv(ringmaster_fd, &id, sizeof(id), MSG_WAITALL);
-    std::cout << "my id: " << id << std::endl;
+    if (DEBUG) {
+      std::cout << "my id: " << id << std::endl;
+    }
+    srand((unsigned int)time(nullptr) + id);
     return 0;
   }
+
+  int receive_num_players() {
+    recv(ringmaster_fd, &num_players, sizeof(num_players), MSG_WAITALL);
+    if (DEBUG) {
+      std::cout << "num_players: " << num_players << std::endl;
+    }
+    return 0;
+  }
+
 
   int connect_neighbor_server() {
     int status;
@@ -213,7 +233,9 @@ public:
       return -1;
     }
 
-    std::cout << "Connecting to " << host_ip << " on port " << host_port << "..." << std::endl;
+    if (DEBUG) {
+      std::cout << "Connecting to " << host_ip << " on port " << host_port << "..." << std::endl;
+    }
 
     status = connect(neighbor_server_fd, host_info_list->ai_addr, host_info_list->ai_addrlen);
     if (status == -1) {
@@ -237,10 +259,12 @@ public:
 
   int init_fd_set() {
     FD_ZERO(&socket_read_fds);
-    std::cout << "ringmaster fd: " << ringmaster_fd << std::endl;
-    std::cout << "neighbor server fd: " << neighbor_server_fd << std::endl;
-    std::cout << "neighbor player connection fd: " << neighbor_player_connection_fd << std::endl;
-    std::cout << "max fd: " << max_fd << std::endl;
+    if (DEBUG) {
+      std::cout << "ringmaster fd: " << ringmaster_fd << std::endl;
+      std::cout << "neighbor server fd: " << neighbor_server_fd << std::endl;
+      std::cout << "neighbor player connection fd: " << neighbor_player_connection_fd << std::endl;
+      std::cout << "max fd: " << max_fd << std::endl;
+    }
 
     FD_SET(ringmaster_fd, &socket_read_fds);
     FD_SET(neighbor_server_fd, &socket_read_fds);
@@ -265,10 +289,14 @@ public:
         if (size == sizeof(potato)) {
           potato = tmp;
         }
-        std::cout << "received potato from master" << std::endl;
+        if (DEBUG) {
+          std::cout << "received potato from master" << std::endl;
+        }
       }
       if (FD_ISSET(neighbor_server_fd, &read_fds)) {
-        std::cout << "received potato from player" << std::endl;
+        if (DEBUG) {
+          std::cout << "received potato from player" << std::endl;
+        }
         potato_t tmp{};
         int size = recv(neighbor_server_fd, &tmp, sizeof(tmp), MSG_WAITALL);
         if (size == sizeof(potato)) {
@@ -276,7 +304,9 @@ public:
         }
       }
       if (FD_ISSET(neighbor_player_connection_fd, &read_fds)) {
-        std::cout << "received potato from player" << std::endl;
+        if (DEBUG) {
+          std::cout << "received potato from player" << std::endl;
+        }
         potato_t tmp{};
         int size = recv(neighbor_player_connection_fd, &tmp, sizeof(tmp), MSG_WAITALL);
         if (size == sizeof(potato)) {
@@ -289,23 +319,27 @@ public:
         continue;
       }
 
-      std::cout << "potato count/hop: " << potato.count << "/" << potato.hop << std::endl;
-      std::cout << "potato trace: " << std::endl;
-      for (int i = 0; i < potato.count; i++) {
-        std::cout << potato.trace[i] << (i == potato.count - 1 ?  "" : ", ");
+      if (DEBUG) {
+        std::cout << "potato count/hop: " << potato.count << "/" << potato.hop << std::endl;
+        std::cout << "potato trace: " << std::endl;
+        for (int i = 0; i < potato.count; i++) {
+          std::cout << potato.trace[i] << (i == potato.count - 1 ?  "" : ", ");
+        }
+        std::cout << "\npotato trace ends. " << std::endl;
       }
-      std::cout << "\npotato trace ends. " << std::endl;
 
       if (potato.end) {
-        std::cout << "this is the end signal from master" << std::endl;
+        if (DEBUG) {
+          std::cout << "this is the end signal from master" << std::endl;
+        }
         break;
       } else {
-        if (potato.count == potato.hop) {
-          std::cout << "potato count/hop: " << potato.count << "/" << potato.hop << ", send to ringmaster" << std::endl;
+        std::cout << "potato count/hop: " << potato.count << "/" << potato.hop << ", send to ringmaster" << std::endl;
+        if (++potato.count == potato.hop) {
           std::cout << "I am it!" << std::endl;
           int size = send(ringmaster_fd, &potato, sizeof(potato), 0);
           if (size != sizeof(potato)) {
-            std::cout << "stupid potato is broken by some stupid dog" << std::endl;
+            std::cerr << "potato is not completely sent, sent size: " << size << std::endl;
           }
           break;
         } else {
@@ -313,16 +347,20 @@ public:
           potato.trace[potato.count] = id;
           potato.count++;
           if (rand_int == 0) {
-            std::cout << "rand int: " << rand_int << ", send to who connects to me" << std::endl;
+            if (DEBUG) {
+              std::cout << "rand int: " << rand_int << ", send to who connects to me" << std::endl;
+            }
             int size = send(neighbor_player_connection_fd, &potato, sizeof(potato), 0);
             if (size != sizeof(potato)) {
-              std::cout << "stupid potato is broken by some stupid dog" << std::endl;
+              std::cerr << "potato is not completely sent, sent size: " << size << std::endl;
             }
           } else {
-            std::cout << "rand int: " << rand_int << ", send to whom I connect to" << std::endl;
+            if (DEBUG) {
+              std::cout << "rand int: " << rand_int << ", send to whom I connect to" << std::endl;
+            }
             int size = send(neighbor_server_fd, &potato, sizeof(potato), 0);
             if (size != sizeof(potato)) {
-              std::cout << "stupid potato is broken by some stupid dog ri" << std::endl;
+              std::cerr << "potato is not completely sent, sent size: " << size << std::endl;
             }
           }
 
@@ -345,6 +383,7 @@ int main(int argc, char *argv[]) {
   player.init_server();
   player.connect_ring_master();
   player.receive_my_id();
+  player.receive_num_players();
   player.receive_neighbor_server_ai();
   player.connect_neighbor_server();
   player.accept_connection();
