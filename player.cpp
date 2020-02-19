@@ -260,24 +260,27 @@ public:
       int rv = select(max_fd + 1, &read_fds, nullptr, nullptr, nullptr);
 //      assert(rv == 1);
       if (FD_ISSET(ringmaster_fd, &read_fds)) {
-        int size = recv(ringmaster_fd, &potato, sizeof(potato), MSG_WAITALL);
-        if (size == 0) {
-          continue;
+        potato_t tmp{};
+        int size = recv(ringmaster_fd, &tmp, sizeof(tmp), MSG_WAITALL);
+        if (size == sizeof(potato)) {
+          potato = tmp;
         }
         std::cout << "received potato from master" << std::endl;
       }
-      else if (FD_ISSET(neighbor_server_fd, &read_fds)) {
+      if (FD_ISSET(neighbor_server_fd, &read_fds)) {
         std::cout << "received potato from player" << std::endl;
-        int size = recv(neighbor_server_fd, &potato, sizeof(potato), MSG_WAITALL);
-        if (size == 0) {
-          continue;
+        potato_t tmp{};
+        int size = recv(neighbor_server_fd, &tmp, sizeof(tmp), MSG_WAITALL);
+        if (size == sizeof(potato)) {
+          potato = tmp;
         }
       }
-      else if (FD_ISSET(neighbor_player_connection_fd, &read_fds)) {
+      if (FD_ISSET(neighbor_player_connection_fd, &read_fds)) {
         std::cout << "received potato from player" << std::endl;
+        potato_t tmp{};
         int size = recv(neighbor_player_connection_fd, &potato, sizeof(potato), MSG_WAITALL);
-        if (size == 0) {
-          continue;
+        if (size == sizeof(potato)) {
+          potato = tmp;
         }
       }
       else {
