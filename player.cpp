@@ -376,17 +376,17 @@ public:
               std::cout << "rand int: " << rand_int << ", send to who connects to me" << std::endl;
             }
             int size = send(neighbor_player_connection_fd, &potato, sizeof(potato), 0);
-            if (size != sizeof(potato)) {
-              std::cerr << "potato is not completely sent, sent size: " << size << std::endl;
-            }
+//            if (size != sizeof(potato)) {
+//              std::cerr << "potato is not completely sent, sent size: " << size << std::endl;
+//            }
           } else {
             if (DEBUG) {
               std::cout << "rand int: " << rand_int << ", send to whom I connect to" << std::endl;
             }
             int size = send(neighbor_server_fd, &potato, sizeof(potato), 0);
-            if (size != sizeof(potato)) {
-              std::cerr << "potato is not completely sent, sent size: " << size << std::endl;
-            }
+//            if (size != sizeof(potato)) {
+//              std::cerr << "potato is not completely sent, sent size: " << size << std::endl;
+//            }
           }
           std::cout << "Sending potato to " << (rand_int == 0 ? player_connection_id : neighbor_server_id) << std::endl;
 
