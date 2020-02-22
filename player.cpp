@@ -421,6 +421,6 @@ int main(int argc, char *argv[]) {
   player.notify_master_I_am_ready();
   player.init_fd_set();
   player.play();
-  sleep(1);
+//  sleep(1);
   return 0;
 }
