@@ -281,6 +281,9 @@ public:
       if (FD_ISSET(player_sock_fd_vec[i], &socket_read_fds)) {
         int size = recv(player_sock_fd_vec[i], &received_potato, sizeof(received_potato), MSG_WAITALL);
         if (size < sizeof(received_potato)) {
+          if (size == 0) {
+            continue;
+          }
           std::cerr << "potato is not completely recv, recv size: " << size << std::endl;
         }
         if (DEBUG) {
