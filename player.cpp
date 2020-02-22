@@ -322,6 +322,8 @@ public:
         int size = recv(neighbor_server_fd, &tmp, sizeof(tmp), MSG_WAITALL);
         if (size == sizeof(potato)) {
           potato = tmp;
+        } else if (size != 0) {
+          std::cerr << "potato is not completely recv, recv size: " << size << std::endl;
         }
       }
       if (FD_ISSET(neighbor_player_connection_fd, &read_fds)) {
@@ -332,11 +334,12 @@ public:
         int size = recv(neighbor_player_connection_fd, &tmp, sizeof(tmp), MSG_WAITALL);
         if (size == sizeof(potato)) {
           potato = tmp;
+        } else if (size != 0) {
+          std::cerr << "potato is not completely recv, recv size: " << size << std::endl;
         }
       }
 
       if (!FD_ISSET(neighbor_player_connection_fd, &read_fds) && !FD_ISSET(neighbor_server_fd, &read_fds) && !FD_ISSET(ringmaster_fd, &read_fds)) {
-        std::cerr << "no idea where this shit comes from" << std::endl;
         continue;
       }
 
@@ -364,7 +367,6 @@ public:
           if (size != sizeof(potato)) {
             std::cerr << "potato is not completely sent, sent size: " << size << std::endl;
           }
-          break;
         } else {
           int rand_int = rand() % 2;
           potato.trace[potato.count-1] = id;
@@ -418,6 +420,6 @@ int main(int argc, char *argv[]) {
   player.notify_master_I_am_ready();
   player.init_fd_set();
   player.play();
-//  sleep(1);
+  sleep(1);
   return 0;
 }
