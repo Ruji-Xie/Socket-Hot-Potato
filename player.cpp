@@ -4,21 +4,8 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <cassert>
-
+#include "potato.cpp"
 #define DEBUG 0
-
-typedef struct player_ai {
-  char ip[INET_ADDRSTRLEN];
-  uint16_t port;
-} player_ai_t;
-
-typedef struct potato {
-  int trace[513];
-  int count;
-  int hop;
-  int end;
-} potato_t;
 
 class Player {
 

@@ -4,7 +4,7 @@ all: $(TARGETS)
 clean:
 	rm -f $(TARGETS)
 
-ringmaster: ring_master.cpp
+ringmaster: ringmaster.cpp
 	g++ -g -o $@ $<
 
 player: player.cpp
