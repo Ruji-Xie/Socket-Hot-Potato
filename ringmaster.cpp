@@ -312,9 +312,6 @@ public:
 
     received_potato.end = true;
     for (int i = 0; i < num_players; i++) {
-      if (i == end_player_id) {
-        continue;
-      }
       if (DEBUG) {
         std::cout << "send end signal to player: " << i << std::endl;
         std::cout << "ip: " << player_ip_vec[i] << std::endl;
