@@ -292,6 +292,7 @@ public:
     if (size != sizeof(id)) {
       std::cerr << "id is not completely sent, sent size: " << size << std::endl;
     }
+    std::cout << "Connected as player " << id << " out of " << num_players << " total players" << std::endl;
     return 0;
   }
 
